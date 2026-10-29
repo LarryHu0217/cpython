@@ -85,17 +85,27 @@ functions: :func:`fnmatch`, :func:`fnmatchcase`, :func:`.filter`, :func:`.filter
 .. function:: filter(names, pat)
 
    Construct a list from those elements of the :term:`iterable` of filename
-   strings *names* that match the pattern string *pat*.
+   strings or :term:`path-like objects <path-like object>` *names* that match
+   the pattern string *pat*.
    It is the same as ``[n for n in names if fnmatch(n, pat)]``,
    but implemented more efficiently.
+
+   .. versionchanged:: 3.16
+      Path-like objects in *names* are now supported on all platforms,
+      rather than only on Windows.
 
 
 .. function:: filterfalse(names, pat)
 
    Construct a list from those elements of the :term:`iterable` of filename
-   strings *names* that do not match the pattern string *pat*.
+   strings or :term:`path-like objects <path-like object>` *names* that do not
+   match the pattern string *pat*.
    It is the same as ``[n for n in names if not fnmatch(n, pat)]``,
    but implemented more efficiently.
+
+   .. versionchanged:: 3.16
+      Path-like objects in *names* are now supported on all platforms,
+      rather than only on Windows.
 
    .. versionadded:: 3.14
 

@@ -1,10 +1,16 @@
 """Test cases for the fnmatch module."""
 
+import fnmatch as fnmatch_module
+import ntpath
 import os
+import pathlib
+import posixpath
 import string
 import unittest
 import warnings
 from fnmatch import fnmatch, fnmatchcase, translate, filter, filterfalse
+from test.support import os_helper
+from unittest import mock
 
 
 IGNORECASE = os.path.normcase('P') == os.path.normcase('p')
@@ -364,6 +370,77 @@ class FilterFalseTestCase(unittest.TestCase):
                          ['usr'] if NORMSEP else ['usr', 'usr\\lib'])
         self.assertEqual(filterfalse(['usr/bin', 'usr', 'usr\\lib'], 'usr\\*'),
                          ['usr'] if NORMSEP else ['usr/bin', 'usr'])
+
+
+class FilterPathLikeTestCase(unittest.TestCase):
+
+    def test_pathlike_names(self):
+        for factory in (pathlib.Path, os_helper.FakePath):
+            for as_bytes in (False, True):
+                if factory is pathlib.Path and as_bytes:
+                    continue
+                values = ['a.py', 'a.txt', 'b.py']
+                pattern = '*.py'
+                if as_bytes:
+                    values = [value.encode() for value in values]
+                    pattern = pattern.encode()
+                first, other, last = [factory(value) for value in values]
+                names = [first, other, last, first]
+                for func, expected in ((filter, [first, last, first]),
+                                       (filterfalse, [other])):
+                    for pat in (pattern, os_helper.FakePath(pattern)):
+                        with self.subTest(factory=factory, as_bytes=as_bytes,
+                                          func=func, pattern=pat):
+                            actual = func(names, pat)
+                            self.assertEqual(actual, expected)
+                            for actual_name, expected_name in zip(actual,
+                                                                  expected):
+                                self.assertIs(actual_name, expected_name)
+
+    def test_pathlike_iterator(self):
+        names = [os_helper.FakePath('a.py'), os_helper.FakePath('b.txt')]
+        for func, expected in ((filter, names[:1]), (filterfalse, names[1:])):
+            with self.subTest(func=func):
+                iterator = iter(names)
+                actual = func(iterator, '*.py')
+                self.assertEqual(actual, expected)
+                self.assertIs(actual[0], expected[0])
+                self.assertEqual(list(iterator), [])
+
+    def test_pathlike_empty(self):
+        for func in (filter, filterfalse):
+            for pattern in ('*', b'*'):
+                with self.subTest(func=func, pattern=pattern):
+                    self.assertEqual(func([], os_helper.FakePath(pattern)), [])
+
+    def test_pathlike_mixed_types(self):
+        for func in (filter, filterfalse):
+            for name, pattern in (('a.py', b'*'), (b'a.py', '*')):
+                with self.subTest(func=func, name=name, pattern=pattern):
+                    with self.assertRaises(TypeError):
+                        func([os_helper.FakePath(name)], pattern)
+
+    def test_pathlike_invalid_fspath(self):
+        for func in (filter, filterfalse):
+            with self.subTest(func=func):
+                with self.assertRaisesRegex(TypeError, '__fspath__'):
+                    func([os_helper.FakePath(42)], '*')
+
+    def test_pathlike_normalization(self):
+        names = [os_helper.FakePath(name) for name in
+                 ('DIR/A.PY', 'dir/b.py', r'dir\c.py', 'dir/d.txt')]
+        for path_module, included, excluded in (
+                (posixpath, [names[1]], [names[0], names[2], names[3]]),
+                (ntpath, names[:3], names[3:])):
+            with mock.patch.object(fnmatch_module, 'os') as mock_os:
+                mock_os.path = path_module
+                for func, expected in ((filter, included),
+                                       (filterfalse, excluded)):
+                    with self.subTest(path_module=path_module, func=func):
+                        actual = func(names, os_helper.FakePath('dir/*.py'))
+                        self.assertEqual(actual, expected)
+                        for actual_name, expected_name in zip(actual, expected):
+                            self.assertIs(actual_name, expected_name)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,3 @@
+Add support for :term:`path-like objects <path-like object>` in the *names*
+argument of :func:`fnmatch.filter` and :func:`fnmatch.filterfalse` on all
+platforms. Previously, these objects were accepted only on Windows.
